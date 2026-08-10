@@ -1,5 +1,4 @@
-
-name: Build AliGodolty OS Complete ISO
+name: Build AliGodolty OS (Source Only)
 
 on:
   workflow_dispatch:
@@ -19,33 +18,28 @@ jobs:
           python3 python3-pip debian-archive-keyring squashfs-tools \
           grub-efi-amd64-bin grub-pc-bin
 
-    - name: Configure AliGodolty OS Environment & Scripts
+    - name: Prepare AliGodolty OS Files (No ISO Build)
       run: |
         mkdir -p build && cd build
 
-        # تكامل المرايا الأبوية والعادية لمنع استخدام أوبونتو
+        # تهيئة lb config (لإنشاء هيكل المجلدات فقط)
         lb config --architectures amd64 \
                   --distribution bookworm \
-                  --parent-mirror-bootstrap "http://deb.debian.org/debian/" \
-                  --parent-mirror-chroot "http://deb.debian.org/debian/" \
-                  --parent-mirror-binary "http://deb.debian.org/debian/" \
-                  --mirror-bootstrap "http://deb.debian.org/debian/" \
-                  --mirror-chroot "http://deb.debian.org/debian/" \
-                  --mirror-binary "http://deb.debian.org/debian/" \
                   --archive-areas "main contrib non-free non-free-firmware" \
                   --bootloader grub-efi \
+                  --binary-images iso-hybrid \
                   --compression xz
 
-        # إنشاء ملف sources.list مخصص داخل النظام (يحل محل الافتراضي)
-        CHROOT_DIR="config/includes.chroot"
-        mkdir -p $CHROOT_DIR/etc/apt/
-        cat << 'EOF' > $CHROOT_DIR/etc/apt/sources.list
+        # إنشاء sources.list داخل النظام
+        mkdir -p config/includes.chroot/etc/apt/
+        cat << 'EOF' > config/includes.chroot/etc/apt/sources.list
         deb http://deb.debian.org/debian/ bookworm main contrib non-free non-free-firmware
         deb http://deb.debian.org/debian/ bookworm-updates main contrib non-free non-free-firmware
         deb http://security.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware
         EOF
 
-        # باقي المجلدات
+        # السكربتات والمجلدات
+        CHROOT_DIR="config/includes.chroot"
         mkdir -p $CHROOT_DIR/usr/bin/
         mkdir -p $CHROOT_DIR/usr/share/aligodolty/
         mkdir -p $CHROOT_DIR/etc/skel/Desktop/
@@ -65,7 +59,7 @@ jobs:
         ===============================================================
         EOF
 
-        # المثبت المرئي (باستخدام whiptail)
+        # المثبت باستخدام whiptail
         cat << 'EOF' > $CHROOT_DIR/usr/bin/aligodolty-installer
         #!/bin/bash
         clear
@@ -96,7 +90,7 @@ jobs:
         EOF
         chmod +x $CHROOT_DIR/usr/bin/aligodolty-installer
 
-        # المساعد الذكي (بدون تغيير)
+        # المساعد الذكي
         cat << 'EOF' > $CHROOT_DIR/usr/bin/aligodolty-ai
         #!/usr/bin/env python3
         import os
@@ -190,7 +184,7 @@ jobs:
         EOF
         chmod +x $CHROOT_DIR/usr/bin/alipsp-mode
 
-        # قائمة الحزم (أضفنا whiptail و dialog للتأكد)
+        # قائمة الحزم
         mkdir -p config/package-lists/
         cat << 'EOF' > config/package-lists/aligodolty.list.chroot
         xfce4
@@ -207,15 +201,18 @@ jobs:
         dialog
         EOF
 
-    - name: Build Final Custom ISO
+        # العودة إلى مجلد build لضغط كل شيء
+        cd ..
+
+    - name: Compress Build Directory (Without Building ISO)
       run: |
         cd build
-        sudo lb clean --purge || true
-        sudo lb build
-        mv live-image-amd64.hybrid.iso AliGodolty-OS-v1.iso
+        # ضغط كل محتويات build (باستثناء الملفات المؤقتة إن وجدت)
+        tar -cJf AliGodolty-OS-Source.tar.xz ./*
+        cd ..
 
-    - name: Upload ISO to GitHub Artifacts
+    - name: Upload Compressed Source to GitHub Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: AliGodolty-OS-ISO
-        path: build/AliGodolty-OS-v1.iso
+        name: AliGodolty-OS-Source
+        path: build/AliGodolty-OS-Source.tar.xz
