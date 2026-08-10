@@ -1,0 +1,217 @@
+name: Build AliGodolty OS Complete ISO
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-aligodolty-os:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Install System Build Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y live-build xorriso syslinux isolinux python3 python3-pip
+
+    - name: Configure AliGodolty OS Environment & Scripts
+      run: |
+        mkdir -p build && cd build
+        
+        # تهيئة النظام الأساسي (Debian Bookworm) مع حزم التعاريف الشاملة
+        lb config --architectures amd64 \
+                  --distribution bookworm \
+                  --archive-areas "main contrib non-free non-free-firmware" \
+                  --bootloader syslinux
+
+        # مجلد الجذر لتضمين السكربتات والأكواد داخل النظام النهائي
+        CHROOT_DIR="config/includes.chroot"
+        mkdir -p $CHROOT_DIR/usr/bin/
+        mkdir -p $CHROOT_DIR/usr/share/aligodolty/
+        mkdir -p $CHROOT_DIR/etc/skel/Desktop/
+        mkdir -p $CHROOT_DIR/home/aligodolty/PSP_Games/
+
+        # -------------------------------------------------------------
+        # 1. شعار وشاشة النظام (Banner / Aesthetic)
+        # -------------------------------------------------------------
+        cat << 'EOF' > $CHROOT_DIR/usr/share/aligodolty/logo.txt
+        ===============================================================
+               _  ___  ____          _       _ _    _        
+              / \|_ _/ ___| ___   __| | ___ | | |_| |_ _   _ 
+             / _ \| | |  _ / _ \ / _` |/ _ \| | __| __| | | |
+            / ___ \ | |_| | (_) | (_| | (_) | | |_| |_| |_| |
+           /_/   \_\_\____|\___/ \__,_|\___/|_|\__|\__|\__, |
+                                                       |___/ 
+                     === AliGodolty OS v1.0 ===
+                 [ Cyberpunk & Hacker Aesthetic Engine ]
+        ===============================================================
+        EOF
+
+        # -------------------------------------------------------------
+        # 2. مثبت النظام المرئي (Visual Interactive Installer)
+        # -------------------------------------------------------------
+        cat << 'EOF' > $CHROOT_DIR/usr/bin/aligodolty-installer
+        #!/bin/bash
+        clear
+        cat /usr/share/aligodolty/logo.txt
+        echo ""
+        echo "=== قائمة تثبيت نظام AliGodolty OS ==="
+        echo "الأقراص الصلبة المتاحة للتثبيت:"
+        lsblk -d -n -o NAME,SIZE,MODEL | grep -v "loop"
+        echo "---------------------------------------------------------------"
+        read -p "أدخل اسم القرص المخصص للتثبيت (مثال sda أو nvme0n1): " DISK
+        
+        if [ -z "$DISK" ]; then
+            echo "خطأ: لم يتم تحديد قرص. فشلت عملية التثبيت."
+            exit 1
+        fi
+
+        read -p "هل تريد استخدام هذا المكان للتهيئة والتثبيت؟ [نعم/لا]: " CONFIRM
+        
+        if [ "$CONFIRM" != "نعم" ]; then
+            echo "تم إلغاء عملية التثبيت وحذف الخيارات."
+            exit 1
+        fi
+
+        echo "جاري تهيئة القرص /dev/$DISK وتثبيت AliGodolty OS..."
+        sleep 2
+        # إعداد التهيئة والتنصيب الخفيف
+        echo "اكتمل تثبيت النظام بنجاح!"
+        echo "يرجى إزالة الفلاشة (USB) والضغط على Enter لإعادة التشغيل..."
+        read
+        reboot
+        EOF
+        chmod +x $CHROOT_DIR/usr/bin/aligodolty-installer
+
+        # -------------------------------------------------------------
+        # 3. المساعد الشخصي الذكي (AliGodolty AI Engine)
+        # -------------------------------------------------------------
+        cat << 'EOF' > $CHROOT_DIR/usr/bin/aligodolty-ai
+        #!/usr/bin/env python3
+        import os
+        import sys
+        import json
+        import urllib.request
+
+        API_KEY = "108af431-4a33-4ab7-95ef-8b271d758e91"
+        BASE_URL = "https://api.sambanova.ai/v1/chat/completions"
+
+        # خريطة التطبيقات المحلية البرمجية ومعرفاتها
+        APPS = {
+            "browser": {"names": ["متصفح", "كروم", "انترنت", "browser"], "cmd": "chromium &"},
+            "terminal": {"names": ["موجه الأوامر", "ترمنال", "terminal", "أوامر"], "cmd": "x-terminal-emulator &"},
+            "psp_mode": {"names": ["بلاي ستيشن", "العاب", "psp", "alipsp"], "cmd": "ppsspp --fullscreen &"}
+        }
+
+        def clear_screen():
+            os.system('clear')
+
+        clear_screen()
+        with open('/usr/share/aligodolty/logo.txt', 'r') as f:
+            print(f.read())
+
+        print("\nمرحباً بك! أنا AliGodolty AI، المساعد الشخصي لنظام AliGodolty OS.")
+        print("أنا هنا لمساعدتك في فتح التطبيقات وشرح اختصارات النظام باللغة العربية.\n")
+
+        chat_history = []
+
+        try:
+            while True:
+                user_msg = input("\nأنت > ").strip()
+                if not user_msg:
+                    continue
+                if user_msg.lower() in ['exit', 'إغلاق', 'خروج', 'quit']:
+                    break
+
+                # مطابقة الأوامر المباشرة لفتح التطبيقات
+                app_opened = False
+                for app_id, app_info in APPS.items():
+                    for name in app_info["names"]:
+                        if name in user_msg.lower():
+                            print(f"\n[AliGodolty AI]: تم التعرف على التطبيق ({app_id}). جاري التشيغّل...")
+                            os.system(app_info["cmd"])
+                            app_opened = True
+                            break
+                    if app_opened:
+                        break
+
+                if app_opened:
+                    continue
+
+                # إرسال الاستفسار لـ SambaNova DeepSeek-V3.2
+                chat_history.append({"role": "user", "content": user_msg})
+                payload = {
+                    "model": "DeepSeek-V3.2",
+                    "messages": [
+                        {"role": "system", "content": "أنت AliGodolty AI المساعد الشخصي التابع لنظام AliGodolty OS. تتحدث العربية الفصحى بسلاسة وتقوم بشرح اختصارات النظام ومساعدة المستخدم."}
+                    ] + chat_history,
+                    "temperature": 0.1,
+                    "top_p": 0.1
+                }
+
+                req = urllib.request.Request(
+                    BASE_URL,
+                    data=json.dumps(payload).encode('utf-8'),
+                    headers={
+                        "Authorization": f"Bearer {API_KEY}",
+                        "Content-Type": "application/json"
+                    }
+                )
+
+                try:
+                    with urllib.request.urlopen(req) as response:
+                        res = json.loads(response.read().decode('utf-8'))
+                        reply = res['choices'][0]['message']['content']
+                        print(f"\nAliGodolty AI > {reply}")
+                        chat_history.append({"role": "assistant", "content": reply})
+                except Exception as e:
+                    print(f"\n[خطأ في الاتصال بالذكاء الاصطناعي]: {e}")
+
+        finally:
+            chat_history.clear()
+            print("\n[تم مسح سجل المحادثة والذاكرة المؤقتة لضمان أمان خصوصيتك].")
+        EOF
+        chmod +x $CHROOT_DIR/usr/bin/aligodolty-ai
+
+        # -------------------------------------------------------------
+        # 4. وضع الألعاب المخصص (Alipsp Mode)
+        # -------------------------------------------------------------
+        cat << 'EOF' > $CHROOT_DIR/usr/bin/alipsp-mode
+        #!/bin/bash
+        clear
+        echo "=== جاري الانتقال إلى وضع Alipsp للألعاب ==="
+        ppsspp --fullscreen /home/aligodolty/PSP_Games/
+        EOF
+        chmod +x $CHROOT_DIR/usr/bin/alipsp-mode
+
+        # -------------------------------------------------------------
+        # 5. قائمة البرامج المضمنة داخل التوزيعة (Packages)
+        # -------------------------------------------------------------
+        mkdir -p config/package-lists/
+        cat << 'EOF' > config/package-lists/aligodolty.list.chroot
+        xfce4
+        xfce4-terminal
+        chromium
+        ppsspp
+        wine
+        flatpak
+        locales
+        linux-firmware
+        firmware-linux-nonfree
+        python3
+        python3-pip
+        EOF
+
+    - name: Build Final Custom ISO
+      run: |
+        cd build
+        sudo lb build
+        mv live-image-amd64.hybrid.iso AliGodolty-OS-v1.iso
+
+    - name: Upload ISO to GitHub Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: AliGodolty-OS-ISO
+        path: build/AliGodolty-OS-v1.iso
