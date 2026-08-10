@@ -14,25 +14,31 @@ jobs:
     - name: Install System Build Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y live-build xorriso syslinux isolinux python3 python3-pip debian-archive-keyring
+        sudo apt-get install -y live-build xorriso syslinux isolinux \
+          python3 python3-pip debian-archive-keyring squashfs-tools \
+          grub-efi-amd64-bin grub-pc-bin
 
     - name: Configure AliGodolty OS Environment & Scripts
       run: |
         mkdir -p build && cd build
-        
-        # تهيئة النظام الأساسي وتحديد المرايا الرسمية لدبيان لتجنب خطأ التنزيل
+
+        # تهيئة النظام مع دعم GPT و UEFI (مع الاحتفاظ بتوافق BIOS)
         lb config --architectures amd64 \
                   --distribution bookworm \
                   --parent-mirror-bootstrap "http://deb.debian.org/debian/" \
                   --parent-mirror-chroot "http://deb.debian.org/debian/" \
                   --parent-mirror-binary "http://deb.debian.org/debian/" \
+                  --parent-mirror-security "http://security.debian.org/debian-security" \
                   --mirror-bootstrap "http://deb.debian.org/debian/" \
                   --mirror-chroot "http://deb.debian.org/debian/" \
                   --mirror-binary "http://deb.debian.org/debian/" \
+                  --mirror-security "http://security.debian.org/debian-security" \
                   --archive-areas "main contrib non-free non-free-firmware" \
-                  --bootloader syslinux
+                  --bootloader grub-efi \
+                  --uefi-secure-boot enable \
+                  --firmware-chroot true
 
-        # مجلد الجذر لتضمين السكربتات والأكواد داخل النظام النهائي
+        # مجلد الجذر لتضمين السكربتات والأكواد
         CHROOT_DIR="config/includes.chroot"
         mkdir -p $CHROOT_DIR/usr/bin/
         mkdir -p $CHROOT_DIR/usr/share/aligodolty/
@@ -40,7 +46,7 @@ jobs:
         mkdir -p $CHROOT_DIR/home/aligodolty/PSP_Games/
 
         # -------------------------------------------------------------
-        # 1. شعار وشاشة النظام (Banner / Aesthetic)
+        # 1. الشعار (نفسه)
         # -------------------------------------------------------------
         cat << 'EOF' > $CHROOT_DIR/usr/share/aligodolty/logo.txt
         ===============================================================
@@ -56,7 +62,7 @@ jobs:
         EOF
 
         # -------------------------------------------------------------
-        # 2. مثبت النظام المرئي (Visual Interactive Installer)
+        # 2. المثبت المرئي (نفسه)
         # -------------------------------------------------------------
         cat << 'EOF' > $CHROOT_DIR/usr/bin/aligodolty-installer
         #!/bin/bash
@@ -91,7 +97,7 @@ jobs:
         chmod +x $CHROOT_DIR/usr/bin/aligodolty-installer
 
         # -------------------------------------------------------------
-        # 3. المساعد الشخصي الذكي (AliGodolty AI Engine)
+        # 3. المساعد الذكي AliGodolty AI (نفسه)
         # -------------------------------------------------------------
         cat << 'EOF' > $CHROOT_DIR/usr/bin/aligodolty-ai
         #!/usr/bin/env python3
@@ -178,7 +184,7 @@ jobs:
         chmod +x $CHROOT_DIR/usr/bin/aligodolty-ai
 
         # -------------------------------------------------------------
-        # 4. وضع الألعاب المخصص (Alipsp Mode)
+        # 4. وضع الألعاب Alipsp Mode (نفسه)
         # -------------------------------------------------------------
         cat << 'EOF' > $CHROOT_DIR/usr/bin/alipsp-mode
         #!/bin/bash
@@ -189,7 +195,7 @@ jobs:
         chmod +x $CHROOT_DIR/usr/bin/alipsp-mode
 
         # -------------------------------------------------------------
-        # 5. قائمة البرامج المضمنة داخل التوزيعة (Packages)
+        # 5. قائمة البرامج (تم حذف wine)
         # -------------------------------------------------------------
         mkdir -p config/package-lists/
         cat << 'EOF' > config/package-lists/aligodolty.list.chroot
@@ -197,7 +203,6 @@ jobs:
         xfce4-terminal
         chromium
         ppsspp
-        wine
         flatpak
         locales
         linux-firmware
@@ -209,6 +214,7 @@ jobs:
     - name: Build Final Custom ISO
       run: |
         cd build
+        sudo lb clean --purge || true
         sudo lb build
         mv live-image-amd64.hybrid.iso AliGodolty-OS-v1.iso
 
@@ -217,4 +223,3 @@ jobs:
       with:
         name: AliGodolty-OS-ISO
         path: build/AliGodolty-OS-v1.iso
-        
