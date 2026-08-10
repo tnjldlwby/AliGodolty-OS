@@ -22,7 +22,7 @@ jobs:
       run: |
         mkdir -p build && cd build
 
-        # تهيئة النظام مع دعم GPT و UEFI (بدون خيارات غير مدعومة)
+        # إعداد lb config بالخيارات الصحيحة للإصدار 3.x
         lb config --architectures amd64 \
                   --distribution bookworm \
                   --parent-mirror-bootstrap "http://deb.debian.org/debian/" \
@@ -34,10 +34,9 @@ jobs:
                   --mirror-binary "http://deb.debian.org/debian/" \
                   --security "http://security.debian.org/debian-security" \
                   --archive-areas "main contrib non-free non-free-firmware" \
-                  --bootloader grub-efi \
-                  --firmware-chroot true
+                  --bootloader grub-efi
 
-        # باقي السكربتات كما هي (نفس المحتوى السابق)
+        # باقي السكربتات كما هي (بدون تغيير)
         CHROOT_DIR="config/includes.chroot"
         mkdir -p $CHROOT_DIR/usr/bin/
         mkdir -p $CHROOT_DIR/usr/share/aligodolty/
