@@ -22,22 +22,29 @@ jobs:
       run: |
         mkdir -p build && cd build
 
-        # التكوين الأساسي فقط، بدون خيارات غير مدعومة
+        # تكوين lb config بدون أي خيارات مرايا (يستخدم الافتراضي من ديبيان)
+        # لكننا سنضبط المصادر يدوياً لاحقاً.
         lb config --architectures amd64 \
                   --distribution bookworm \
-                  --mirror-bootstrap "http://deb.debian.org/debian/" \
-                  --mirror-chroot "http://deb.debian.org/debian/" \
-                  --mirror-binary "http://deb.debian.org/debian/" \
                   --archive-areas "main contrib non-free non-free-firmware" \
                   --bootloader grub-efi
 
-        # باقي السكربتات (بدون تغيير)
+        # إنشاء ملف sources.list مخصص لتجاوز أي مصادر خاطئة (خصوصاً أوبونتو)
+        mkdir -p config/archives
+        cat << 'EOF' > config/archives/debian.list.chroot
+        deb http://deb.debian.org/debian/ bookworm main contrib non-free non-free-firmware
+        deb http://deb.debian.org/debian/ bookworm-updates main contrib non-free non-free-firmware
+        deb http://security.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware
+        EOF
+
+        # باقي السكربتات والمجلدات (بدون تغيير)
         CHROOT_DIR="config/includes.chroot"
         mkdir -p $CHROOT_DIR/usr/bin/
         mkdir -p $CHROOT_DIR/usr/share/aligodolty/
         mkdir -p $CHROOT_DIR/etc/skel/Desktop/
         mkdir -p $CHROOT_DIR/home/aligodolty/PSP_Games/
 
+        # الشعار
         cat << 'EOF' > $CHROOT_DIR/usr/share/aligodolty/logo.txt
         ===============================================================
                _  ___  ____          _       _ _    _        
@@ -51,6 +58,7 @@ jobs:
         ===============================================================
         EOF
 
+        # المثبت المرئي
         cat << 'EOF' > $CHROOT_DIR/usr/bin/aligodolty-installer
         #!/bin/bash
         clear
@@ -83,6 +91,7 @@ jobs:
         EOF
         chmod +x $CHROOT_DIR/usr/bin/aligodolty-installer
 
+        # المساعد الذكي
         cat << 'EOF' > $CHROOT_DIR/usr/bin/aligodolty-ai
         #!/usr/bin/env python3
         import os
@@ -167,6 +176,7 @@ jobs:
         EOF
         chmod +x $CHROOT_DIR/usr/bin/aligodolty-ai
 
+        # وضع الألعاب
         cat << 'EOF' > $CHROOT_DIR/usr/bin/alipsp-mode
         #!/bin/bash
         clear
@@ -175,6 +185,7 @@ jobs:
         EOF
         chmod +x $CHROOT_DIR/usr/bin/alipsp-mode
 
+        # قائمة الحزم (بدون wine)
         mkdir -p config/package-lists/
         cat << 'EOF' > config/package-lists/aligodolty.list.chroot
         xfce4
