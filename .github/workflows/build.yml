@@ -14,42 +14,44 @@ jobs:
     - name: Install Dependencies
       run: |
         sudo apt-get update
+        # نثبت grub-pc فقط (بدون grub-efi-amd64) لتجنب التعارض
         sudo apt-get install -y live-build xorriso syslinux isolinux \
-          debian-archive-keyring grub-pc grub-efi-amd64 squashfs-tools fdisk
+          debian-archive-keyring grub-pc squashfs-tools fdisk
         
         # استيراد مفتاح Debian bookworm
         wget -O /usr/share/keyrings/debian-archive-bookworm-stable.gpg \
           https://ftp-master.debian.org/keys/archive-key-12.asc
-        gpg --no-default-keyring \
+        sudo gpg --no-default-keyring \
           --keyring /usr/share/keyrings/debian-archive-keyring.gpg \
           --import /usr/share/keyrings/debian-archive-bookworm-stable.gpg
       
     - name: Build ISO
       run: |
-        # إذا كان لديك مجلد build في المستودع
-        if [ -d "build" ]; then
-          cd build
-        else
-          # أو أنشئ مجلد build جديد
-          mkdir -p build && cd build
-          
-          # تهيئة lb config
-          lb config --architectures amd64 \
-            --distribution bookworm \
-            --parent-mirror-bootstrap "http://deb.debian.org/debian/" \
-            --parent-mirror-chroot "http://deb.debian.org/debian/" \
-            --parent-mirror-binary "http://deb.debian.org/debian/" \
-            --archive-areas "main contrib non-free non-free-firmware" \
-            --bootloader grub-efi
-          
-          # إضافة ملفاتك المخصصة
-          mkdir -p config/includes.chroot/usr/bin/
-          mkdir -p config/includes.chroot/usr/share/aligodolty/
-          mkdir -p config/includes.chroot/etc/skel/Desktop/
-          mkdir -p config/includes.chroot/home/aligodolty/PSP_Games/
-          
-          # أضف logo
-          cat > config/includes.chroot/usr/share/aligodolty/logo.txt << 'EOF'
+        # إنشاء مجلد build
+        mkdir -p build && cd build
+        
+        # تهيئة lb config (مع syslinux بدلاً من grub-efi)
+        lb config --architectures amd64 \
+          --distribution bookworm \
+          --parent-mirror-bootstrap "http://deb.debian.org/debian/" \
+          --parent-mirror-chroot "http://deb.debian.org/debian/" \
+          --parent-mirror-binary "http://deb.debian.org/debian/" \
+          --mirror-bootstrap "http://deb.debian.org/debian/" \
+          --mirror-chroot "http://deb.debian.org/debian/" \
+          --mirror-binary "http://deb.debian.org/debian/" \
+          --archive-areas "main contrib non-free non-free-firmware" \
+          --bootloader syslinux \
+          --binary-images iso-hybrid \
+          --initramfs "live-boot"
+        
+        # إضافة ملفاتك المخصصة
+        mkdir -p config/includes.chroot/usr/bin/
+        mkdir -p config/includes.chroot/usr/share/aligodolty/
+        mkdir -p config/includes.chroot/etc/skel/Desktop/
+        mkdir -p config/includes.chroot/home/aligodolty/PSP_Games/
+        
+        # أضف logo
+        cat > config/includes.chroot/usr/share/aligodolty/logo.txt << 'EOF'
         ===============================================================
                _  ___  ____          _       _ _    _        
               / \|_ _/ ___| ___   __| | ___ | | |_| |_ _   _ 
@@ -61,9 +63,9 @@ jobs:
                  [ Cyberpunk & Hacker Aesthetic Engine ]
         ===============================================================
         EOF
-          
-          # أضف المثبت
-          cat > config/includes.chroot/usr/bin/aligodolty-installer << 'EOF'
+        
+        # أضف المثبت
+        cat > config/includes.chroot/usr/bin/aligodolty-installer << 'EOF'
         #!/bin/bash
         clear
         cat /usr/share/aligodolty/logo.txt
@@ -89,10 +91,10 @@ jobs:
             exit 1
         fi
         EOF
-          chmod +x config/includes.chroot/usr/bin/aligodolty-installer
-          
-          # أضف AI
-          cat > config/includes.chroot/usr/bin/aligodolty-ai << 'EOF'
+        chmod +x config/includes.chroot/usr/bin/aligodolty-installer
+        
+        # أضف AI
+        cat > config/includes.chroot/usr/bin/aligodolty-ai << 'EOF'
         #!/usr/bin/env python3
         import os, sys, json, urllib.request
         API_KEY = "108af431-4a33-4ab7-95ef-8b271d758e91"
@@ -137,20 +139,20 @@ jobs:
             chat_history.clear()
             print("\\n[تم مسح سجل المحادثة والذاكرة المؤقتة لضمان أمان خصوصيتك].")
         EOF
-          chmod +x config/includes.chroot/usr/bin/aligodolty-ai
-          
-          # أضف Alipsp Mode
-          cat > config/includes.chroot/usr/bin/alipsp-mode << 'EOF'
+        chmod +x config/includes.chroot/usr/bin/aligodolty-ai
+        
+        # أضف Alipsp Mode
+        cat > config/includes.chroot/usr/bin/alipsp-mode << 'EOF'
         #!/bin/bash
         clear
         echo "=== جاري الانتقال إلى وضع Alipsp للألعاب ==="
         ppsspp --fullscreen /home/aligodolty/PSP_Games/
         EOF
-          chmod +x config/includes.chroot/usr/bin/alipsp-mode
-          
-          # قائمة الحزم
-          mkdir -p config/package-lists/
-          cat > config/package-lists/aligodolty.list.chroot << 'EOF'
+        chmod +x config/includes.chroot/usr/bin/alipsp-mode
+        
+        # قائمة الحزم
+        mkdir -p config/package-lists/
+        cat > config/package-lists/aligodolty.list.chroot << 'EOF'
         xfce4
         xfce4-terminal
         chromium
@@ -164,15 +166,14 @@ jobs:
         whiptail
         dialog
         EOF
-          
-          # sources.list
-          mkdir -p config/includes.chroot/etc/apt/
-          cat > config/includes.chroot/etc/apt/sources.list << 'EOF'
+        
+        # sources.list
+        mkdir -p config/includes.chroot/etc/apt/
+        cat > config/includes.chroot/etc/apt/sources.list << 'EOF'
         deb http://deb.debian.org/debian/ bookworm main contrib non-free non-free-firmware
         deb http://deb.debian.org/debian/ bookworm-updates main contrib non-free non-free-firmware
         deb http://security.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware
         EOF
-        fi
         
         # بناء الـ ISO
         sudo lb build 2>&1 | tee build.log
