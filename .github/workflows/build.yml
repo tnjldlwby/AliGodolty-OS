@@ -22,32 +22,29 @@ jobs:
       run: |
         mkdir -p build && cd build
 
-        # تهيئة النظام مع دعم GPT و UEFI (مع الاحتفاظ بتوافق BIOS)
+        # تهيئة النظام مع دعم GPT و UEFI (بدون خيارات غير مدعومة)
         lb config --architectures amd64 \
                   --distribution bookworm \
                   --parent-mirror-bootstrap "http://deb.debian.org/debian/" \
                   --parent-mirror-chroot "http://deb.debian.org/debian/" \
                   --parent-mirror-binary "http://deb.debian.org/debian/" \
-                  --parent-mirror-security "http://security.debian.org/debian-security" \
+                  --parent-security "http://security.debian.org/debian-security" \
                   --mirror-bootstrap "http://deb.debian.org/debian/" \
                   --mirror-chroot "http://deb.debian.org/debian/" \
                   --mirror-binary "http://deb.debian.org/debian/" \
-                  --mirror-security "http://security.debian.org/debian-security" \
+                  --security "http://security.debian.org/debian-security" \
                   --archive-areas "main contrib non-free non-free-firmware" \
                   --bootloader grub-efi \
-                  --uefi-secure-boot enable \
                   --firmware-chroot true
 
-        # مجلد الجذر لتضمين السكربتات والأكواد
+        # باقي السكربتات كما هي (نفس المحتوى السابق)
         CHROOT_DIR="config/includes.chroot"
         mkdir -p $CHROOT_DIR/usr/bin/
         mkdir -p $CHROOT_DIR/usr/share/aligodolty/
         mkdir -p $CHROOT_DIR/etc/skel/Desktop/
         mkdir -p $CHROOT_DIR/home/aligodolty/PSP_Games/
 
-        # -------------------------------------------------------------
-        # 1. الشعار (نفسه)
-        # -------------------------------------------------------------
+        # الشعار
         cat << 'EOF' > $CHROOT_DIR/usr/share/aligodolty/logo.txt
         ===============================================================
                _  ___  ____          _       _ _    _        
@@ -61,9 +58,7 @@ jobs:
         ===============================================================
         EOF
 
-        # -------------------------------------------------------------
-        # 2. المثبت المرئي (نفسه)
-        # -------------------------------------------------------------
+        # المثبت المرئي
         cat << 'EOF' > $CHROOT_DIR/usr/bin/aligodolty-installer
         #!/bin/bash
         clear
@@ -96,9 +91,7 @@ jobs:
         EOF
         chmod +x $CHROOT_DIR/usr/bin/aligodolty-installer
 
-        # -------------------------------------------------------------
-        # 3. المساعد الذكي AliGodolty AI (نفسه)
-        # -------------------------------------------------------------
+        # المساعد الذكي AliGodolty AI
         cat << 'EOF' > $CHROOT_DIR/usr/bin/aligodolty-ai
         #!/usr/bin/env python3
         import os
@@ -183,9 +176,7 @@ jobs:
         EOF
         chmod +x $CHROOT_DIR/usr/bin/aligodolty-ai
 
-        # -------------------------------------------------------------
-        # 4. وضع الألعاب Alipsp Mode (نفسه)
-        # -------------------------------------------------------------
+        # وضع الألعاب Alipsp Mode
         cat << 'EOF' > $CHROOT_DIR/usr/bin/alipsp-mode
         #!/bin/bash
         clear
@@ -194,9 +185,7 @@ jobs:
         EOF
         chmod +x $CHROOT_DIR/usr/bin/alipsp-mode
 
-        # -------------------------------------------------------------
-        # 5. قائمة البرامج (تم حذف wine)
-        # -------------------------------------------------------------
+        # قائمة البرامج (بدون wine)
         mkdir -p config/package-lists/
         cat << 'EOF' > config/package-lists/aligodolty.list.chroot
         xfce4
