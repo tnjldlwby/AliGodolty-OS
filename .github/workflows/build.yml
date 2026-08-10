@@ -1,3 +1,4 @@
+
 name: Build AliGodolty OS Complete ISO
 
 on:
@@ -22,28 +23,35 @@ jobs:
       run: |
         mkdir -p build && cd build
 
-        # تكوين بسيط مع تحديد مرآة البوتستراب فقط
+        # تكامل المرايا الأبوية والعادية لمنع استخدام أوبونتو
         lb config --architectures amd64 \
                   --distribution bookworm \
+                  --parent-mirror-bootstrap "http://deb.debian.org/debian/" \
+                  --parent-mirror-chroot "http://deb.debian.org/debian/" \
+                  --parent-mirror-binary "http://deb.debian.org/debian/" \
                   --mirror-bootstrap "http://deb.debian.org/debian/" \
+                  --mirror-chroot "http://deb.debian.org/debian/" \
+                  --mirror-binary "http://deb.debian.org/debian/" \
                   --archive-areas "main contrib non-free non-free-firmware" \
-                  --bootloader grub-efi
+                  --bootloader grub-efi \
+                  --compression xz
 
-        # إضافة ملف sources.list لضمان استخدام مستودع الأمان الصحيح
-        mkdir -p config/archives
-        cat << 'EOF' > config/archives/debian.list.chroot
+        # إنشاء ملف sources.list مخصص داخل النظام (يحل محل الافتراضي)
+        CHROOT_DIR="config/includes.chroot"
+        mkdir -p $CHROOT_DIR/etc/apt/
+        cat << 'EOF' > $CHROOT_DIR/etc/apt/sources.list
         deb http://deb.debian.org/debian/ bookworm main contrib non-free non-free-firmware
         deb http://deb.debian.org/debian/ bookworm-updates main contrib non-free non-free-firmware
         deb http://security.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware
         EOF
 
-        # باقي السكربتات والمجلدات (بدون تغيير)
-        CHROOT_DIR="config/includes.chroot"
+        # باقي المجلدات
         mkdir -p $CHROOT_DIR/usr/bin/
         mkdir -p $CHROOT_DIR/usr/share/aligodolty/
         mkdir -p $CHROOT_DIR/etc/skel/Desktop/
         mkdir -p $CHROOT_DIR/home/aligodolty/PSP_Games/
 
+        # الشعار
         cat << 'EOF' > $CHROOT_DIR/usr/share/aligodolty/logo.txt
         ===============================================================
                _  ___  ____          _       _ _    _        
@@ -57,6 +65,7 @@ jobs:
         ===============================================================
         EOF
 
+        # المثبت المرئي (باستخدام whiptail)
         cat << 'EOF' > $CHROOT_DIR/usr/bin/aligodolty-installer
         #!/bin/bash
         clear
@@ -66,29 +75,28 @@ jobs:
         echo "الأقراص الصلبة المتاحة للتثبيت:"
         lsblk -d -n -o NAME,SIZE,MODEL | grep -v "loop"
         echo "---------------------------------------------------------------"
-        read -p "أدخل اسم القرص المخصص للتثبيت (مثال sda أو nvme0n1): " DISK
         
+        DISK=$(whiptail --inputbox "أدخل اسم القرص المخصص للتثبيت (مثال sda أو nvme0n1):" 10 60 --title "تحديد القرص" 3>&1 1>&2 2>&3)
         if [ -z "$DISK" ]; then
-            echo "خطأ: لم يتم تحديد قرص. فشلت عملية التثبيت."
+            whiptail --msgbox "خطأ: لم يتم تحديد قرص. فشلت عملية التثبيت." 10 60
             exit 1
         fi
 
-        read -p "هل تريد استخدام هذا المكان للتهيئة والتثبيت؟ [نعم/لا]: " CONFIRM
-        
-        if [ "$CONFIRM" != "نعم" ]; then
-            echo "تم إلغاء عملية التثبيت وحذف الخيارات."
+        if whiptail --yesno "هل تريد استخدام هذا المكان للتهيئة والتثبيت؟\nالقرص: /dev/$DISK" 10 60; then
+            echo "جاري تهيئة القرص /dev/$DISK وتثبيت AliGodolty OS..."
+            sleep 2
+            echo "اكتمل تثبيت النظام بنجاح!"
+            echo "يرجى إزالة الفلاشة (USB) والضغط على Enter لإعادة التشغيل..."
+            read
+            reboot
+        else
+            whiptail --msgbox "تم إلغاء عملية التثبيت." 10 60
             exit 1
         fi
-
-        echo "جاري تهيئة القرص /dev/$DISK وتثبيت AliGodolty OS..."
-        sleep 2
-        echo "اكتمل تثبيت النظام بنجاح!"
-        echo "يرجى إزالة الفلاشة (USB) والضغط على Enter لإعادة التشغيل..."
-        read
-        reboot
         EOF
         chmod +x $CHROOT_DIR/usr/bin/aligodolty-installer
 
+        # المساعد الذكي (بدون تغيير)
         cat << 'EOF' > $CHROOT_DIR/usr/bin/aligodolty-ai
         #!/usr/bin/env python3
         import os
@@ -173,6 +181,7 @@ jobs:
         EOF
         chmod +x $CHROOT_DIR/usr/bin/aligodolty-ai
 
+        # وضع الألعاب
         cat << 'EOF' > $CHROOT_DIR/usr/bin/alipsp-mode
         #!/bin/bash
         clear
@@ -181,6 +190,7 @@ jobs:
         EOF
         chmod +x $CHROOT_DIR/usr/bin/alipsp-mode
 
+        # قائمة الحزم (أضفنا whiptail و dialog للتأكد)
         mkdir -p config/package-lists/
         cat << 'EOF' > config/package-lists/aligodolty.list.chroot
         xfce4
@@ -193,6 +203,8 @@ jobs:
         firmware-linux-nonfree
         python3
         python3-pip
+        whiptail
+        dialog
         EOF
 
     - name: Build Final Custom ISO
@@ -206,4 +218,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: AliGodolty-OS-ISO
-        path: build/AliGodolty-OS-v1.isoty-OS-v1.iso
+        path: build/AliGodolty-OS-v1.iso
